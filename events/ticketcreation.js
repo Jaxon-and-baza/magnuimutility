@@ -1,81 +1,47 @@
-const { 
-    EmbedBuilder, 
-    ButtonBuilder, 
-    ActionRowBuilder, 
-    ButtonStyle, 
-    PermissionFlagsBits, 
-    ChannelType, 
-    ModalBuilder, 
-    TextInputBuilder, 
-    TextInputStyle 
-} = require('discord.js');
+const { EmbedBuilder, ButtonBuilder, ActionRowBuilder, ButtonStyle, PermissionFlagsBits, ChannelType, ModalBuilder, TextInputBuilder, TextInputStyle } = require('discord.js');
 const discordTranscripts = require('discord-html-transcripts');
 
 module.exports = {
     name: 'interactionCreate',
     async execute(interaction) {
         try {
-            let ticketCreator; // Track ticket creator
-            
-            // Handle purchase ticket button interaction
-            if (interaction.isButton() && interaction.customId === 'purchase_ticket') {
+            let ticketCreator;
+
+            if (interaction.isButton() && interaction.customId === 'open_ticket') {
+                console.log('Button pressed: open_ticket');
+
                 const modal = new ModalBuilder()
-                    .setCustomId('ticketModal2')
-                    .setTitle('Form to Open a Ticket')
-                    .addComponents(
-                        new ActionRowBuilder().addComponents(
-                            new TextInputBuilder()
-                                .setCustomId('reasonInput')
-                                .setLabel('What Type of Service?')
-                                .setStyle(TextInputStyle.Short)
-                                .setRequired(true)
-                                .setPlaceholder('Enter your reason here')
-                        ),
-                        new ActionRowBuilder().addComponents(
-                            new TextInputBuilder()
-                                .setCustomId('amount')
-                                .setLabel('Amount')
-                                .setStyle(TextInputStyle.Short)
-                                .setRequired(true)
-                                .setPlaceholder('Enter your amount here')
-                        ),
-                        new ActionRowBuilder().addComponents(
-                            new TextInputBuilder()
-                                .setCustomId('paymentmethod')
-                                .setLabel('Payment Method')
-                                .setStyle(TextInputStyle.Short)
-                                .setRequired(true)
-                                .setPlaceholder('Enter your payment method here')
-                        ),
-                        new ActionRowBuilder().addComponents(
-                            new TextInputBuilder()
-                                .setCustomId('video')
-                                .setLabel('Video Link')
-                                .setStyle(TextInputStyle.Short)
-                                .setRequired(true)
-                                .setPlaceholder('Link to video/account')
-                        )
-                    );
+                    .setCustomId('ticketModal')
+                    .setTitle('Ticket Information');
+
+                const reasonInput = new TextInputBuilder()
+                    .setCustomId('reasonInput')
+                    .setLabel("Reason for opening the ticket")
+                    .setStyle(TextInputStyle.Paragraph)
+                    .setRequired(true)
+                    .setPlaceholder('Enter your reason here');
+
+                const firstActionRow = new ActionRowBuilder().addComponents(reasonInput);
+
+                modal.addComponents(firstActionRow);
 
                 await interaction.showModal(modal);
             }
 
-            // Handle modal submission
-            if (interaction.isModalSubmit() && interaction.customId === 'ticketModal2') {
+            if (interaction.isModalSubmit() && interaction.customId === 'ticketModal') {
                 const reason = interaction.fields.getTextInputValue('reasonInput');
+                console.log(`Collected reason: ${reason}`);
                 ticketCreator = interaction.user;
 
                 if (!reason) {
-                    return interaction.reply({
-                        content: 'A reason is required to open a ticket.',
-                        ephemeral: true
-                    });
+                    return interaction.reply({ content: 'Reason is required to open a ticket.', ephemeral: true });
                 }
 
+                const categoryId = '1143259888244502590'; 
                 const guild = interaction.guild;
-                const categoryId = '1143259888244502590'; // Ticket category ID
+
                 const ticketChannel = await guild.channels.create({
-                    name: `purchase-${interaction.user.username}`,
+                    name: `ticket-${interaction.user.username}`,
                     type: ChannelType.GuildText,
                     parent: categoryId,
                     permissionOverwrites: [
@@ -84,7 +50,7 @@ module.exports = {
                             deny: [PermissionFlagsBits.ViewChannel]
                         },
                         {
-                            id: '1255792278295937126', // Support role ID
+                            id: '1255792278295937126',
                             allow: [PermissionFlagsBits.ViewChannel]
                         },
                         {
@@ -94,97 +60,125 @@ module.exports = {
                     ]
                 });
 
+                await ticketChannel.send(`${interaction.user}, <@&1255792278295937126>`);
+
                 const embed = new EmbedBuilder()
                     .setColor(0x00AE86)
-                    .setTitle('Purchase Assistance')
-                    .setImage('https://cdn.discordapp.com/attachments/1311352918036975726/1312433384844169297/standard_1.gif')
-                    .setDescription(`
-                        Hey, thank you for reaching out to our team for your purchase request. Please wait for our team to respond.
+                    .setTitle('Ticket Assistance')
+                    .setImage("https://cdn.discordapp.com/attachments/1311352918036975726/1312433384844169297/standard_1.gif")
+                    .setDescription(`Hey, thank you for creating a ticket! Please go ahead and tell us the reason why you opened a ticket and our staff team will shortly arrive to support you. Thank you!
 
-                        **Details:**
-                        > User Name: ${interaction.user.tag}
-                        > Service: ${reason}
-                        > Amount: ${interaction.fields.getTextInputValue('amount')}
-                        > Payment Method: ${interaction.fields.getTextInputValue('paymentmethod')}
-                        > Video/Account Link: ${interaction.fields.getTextInputValue('video')}
-                    `)
+                    > User Name: ${interaction.user.tag}
+                    > Reason: ${reason}`)
                     .setFooter({ text: 'Magnum Store', iconURL: guild.iconURL() });
 
                 const closeButton = new ButtonBuilder()
-                    .setCustomId('close_ticket2')
+                    .setCustomId('close_ticket')
                     .setLabel('Close Ticket')
                     .setStyle(ButtonStyle.Danger);
 
-                await ticketChannel.send({
-                    content: `${interaction.user}, <@&1255792278295937126>`,
-                    embeds: [embed],
-                    components: [new ActionRowBuilder().addComponents(closeButton)]
-                });
+                const row = new ActionRowBuilder().addComponents(closeButton);
+
+                await ticketChannel.send({ embeds: [embed], components: [row] });
 
                 await interaction.reply({
                     content: 'Your ticket has been created successfully! Check the new channel for further assistance.',
                     ephemeral: true
                 });
+
+                console.log(`Ticket channel created successfully for ${interaction.user.username}`);
             }
 
-            // Handle ticket close button
-            if (interaction.isButton() && interaction.customId === 'close_ticket2') {
-                if (interaction.channel.name.startsWith('purchase-')) {
-                    if (ticketCreator.id !== interaction.user.id) {
-                        return interaction.reply({
-                            content: 'You cannot close this ticket as you are not the creator.',
-                            ephemeral: true
-                        });
-                    }
-
-                    const confirmationEmbed = new EmbedBuilder()
-                        .setColor(0xFF0000)
-                        .setTitle('Confirm Ticket Closure')
-                        .setDescription('Are you sure you want to close this ticket? Once closed, it cannot be reopened.')
-                        .setFooter({ text: 'Magnum Store', iconURL: interaction.guild.iconURL() });
-
-                    const yesButton = new ButtonBuilder()
-                        .setCustomId('close_ticket_confirm2')
-                        .setLabel('Yes, Close Ticket')
-                        .setStyle(ButtonStyle.Danger);
-
-                    await interaction.reply({
-                        embeds: [confirmationEmbed],
-                        components: [new ActionRowBuilder().addComponents(yesButton)],
-                        ephemeral: true
-                    });
-                }
-            }
-
-            // Confirm ticket closure
-            if (interaction.isButton() && interaction.customId === 'close_ticket_confirm2') {
+            if (interaction.isButton() && interaction.customId === 'close_ticket') {
                 const ticketChannel = interaction.channel;
 
-                await interaction.deferReply({ ephemeral: true });
-                try {
-                    const transcriptAttachment = await discordTranscripts.createTranscript(ticketChannel, {
-                        limit: -1,
-                        returnBuffer: true,
-                        fileName: `${ticketChannel.name}.html`
-                    });
-
-                    await ticketChannel.delete();
-                    await interaction.followUp({
-                        content: 'Ticket closed successfully.',
+                if (ticketCreator.id !== interaction.user.id) {
+                    return interaction.reply({
+                        content: 'You are not the creator of this ticket and cannot close it.',
                         ephemeral: true
                     });
+                }
 
-                    await interaction.user.send({
-                        content: 'Here is the transcript of your closed ticket:',
-                        files: [transcriptAttachment]
+                const confirmationEmbed = new EmbedBuilder()
+                    .setColor(0xFF0000)
+                    .setTitle('Are you sure you want to close this ticket?')
+                    .setDescription('Once closed, you won\'t be able to reply to this ticket. Please confirm.')
+                    .setFooter({ text: 'Magnum Store', iconURL: ticketChannel.guild.iconURL() });
+
+                const yesButton = new ButtonBuilder()
+                    .setCustomId('close_ticket_confirm')
+                    .setLabel('Yes, Close Ticket')
+                    .setStyle(ButtonStyle.Danger);
+
+                const noButton = new ButtonBuilder()
+                    .setCustomId('close_ticket_cancel')
+                    .setLabel('No, Keep Ticket Open')
+                    .setStyle(ButtonStyle.Secondary);
+
+                const row = new ActionRowBuilder().addComponents(yesButton, noButton);
+
+                await interaction.reply({
+                    embeds: [confirmationEmbed],
+                    components: [row],
+                    ephemeral: true
+                });
+            }
+
+            if (interaction.isButton() && interaction.customId === 'close_ticket_confirm') {
+                const ticketChannel = interaction.channel;
+                const ticketCreator = interaction.user;
+
+                await interaction.deferReply({ ephemeral: true });
+
+                try {
+                    const transcriptAttachment = await discordTranscripts.createTranscript(ticketChannel, {
+                        limit: 200000,
+                        returnType: 'attachment',
+                        filename: `${ticketCreator.id}.html`,
+                        saveImages: true,
+                        poweredBy: false,
+                        hydrate: true,
+                        filter: (message) => true
                     });
+
+                    const embed = new EmbedBuilder()
+                        .setColor(0x00AE86)
+                        .setTitle('Ticket Closed')
+                        .setDescription(`Hello ${interaction.user.username}, your support ticket has been closed successfully. Information about the ticket has been provided below and thank you for using our service.
+                            
+                            > Ticket ID: ${interaction.channel.id}
+                            > Closed By: ${interaction.user.tag}
+                            > Open Time: ${interaction.channel.createdAt}
+                            > Close Time: ${new Date().toLocaleString()}`)
+
+                        .setFooter({ text: 'Magnum Store', iconURL: ticketChannel.guild.iconURL() });
+
+                    await ticketCreator.send({ embeds: [embed], files: [transcriptAttachment] });
+
+                    await ticketChannel.delete();
+                    console.log(`Ticket closed and transcript sent successfully by ${interaction.user.username}`);
                 } catch (error) {
                     console.error('Error closing ticket:', error);
-                    await interaction.followUp({ content: 'An error occurred while closing the ticket.', ephemeral: true });
+                    await interaction.followUp({ content: 'There was an error while closing your ticket. Please try again later.', ephemeral: true });
                 }
             }
+
+            if (interaction.isButton() && interaction.customId === 'close_ticket_cancel') {
+                await interaction.update({
+                    content: 'Ticket close has been canceled. You can continue the conversation here.',
+                    embeds: [],
+                    components: [],
+                    ephemeral: true
+                });
+            }
+
         } catch (error) {
             console.error('Error processing interaction:', error);
+            if (interaction.deferred || interaction.replied) {
+                await interaction.followUp({ content: 'An error occurred while processing your request.', ephemeral: true });
+            } else {
+                await interaction.reply({ content: 'An error occurred. Please try again.', ephemeral: true });
+            }
         }
-    }
+    },
 };

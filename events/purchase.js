@@ -7,16 +7,15 @@ module.exports = {
         try {
             let ticketCreator;
 
-            // Purchase ticket modal trigger
+            // Triggering modal for purchase ticket
             if (interaction.isButton() && interaction.customId === 'purchase_ticket') {
                 console.log('Button pressed: purchase_ticket');
 
-                // Creating the modal using addComponents() method
+                // Creating modal for ticket creation
                 const modal = new ModalBuilder()
                     .setCustomId('ticketModal2')
                     .setTitle('Form to open a ticket')
                     .addComponents(
-                        // Reason input row
                         new ActionRowBuilder().addComponents(
                             new TextInputBuilder()
                                 .setCustomId('reasonInput')
@@ -25,7 +24,6 @@ module.exports = {
                                 .setRequired(true)
                                 .setPlaceholder('Enter your reason here')
                         ),
-                        // Amount input row
                         new ActionRowBuilder().addComponents(
                             new TextInputBuilder()
                                 .setCustomId('amount')
@@ -34,7 +32,6 @@ module.exports = {
                                 .setRequired(true)
                                 .setPlaceholder('Enter your amount here')
                         ),
-                        // Payment method input row
                         new ActionRowBuilder().addComponents(
                             new TextInputBuilder()
                                 .setCustomId('paymentmethod')
@@ -43,34 +40,36 @@ module.exports = {
                                 .setRequired(true)
                                 .setPlaceholder('Enter your payment method here')
                         ),
-                        // Video link input row
                         new ActionRowBuilder().addComponents(
                             new TextInputBuilder()
                                 .setCustomId('video')
                                 .setLabel("Video Link")
                                 .setStyle(TextInputStyle.Short)
                                 .setRequired(true)
-                                .setPlaceholder('Link to video/account')
-                        )
+                                .setPlaceholder('Enter the video link')
+                        ),
                     );
 
-                // Show the modal to the user
                 await interaction.showModal(modal);
             }
 
             // Handling modal submission
             if (interaction.isModalSubmit() && interaction.customId === 'ticketModal2') {
                 const reason = interaction.fields.getTextInputValue('reasonInput');
-                console.log(`Collected reason: ${reason}`);
+                const amount = interaction.fields.getTextInputValue('amount');
+                const paymentmethod = interaction.fields.getTextInputValue('paymentmethod');
+                const video = interaction.fields.getTextInputValue('video');
+                console.log(`Collected info: ${reason}, ${amount}, ${paymentmethod}, ${video}`);
                 ticketCreator = interaction.user;
 
-                if (!reason) {
-                    return interaction.reply({ content: 'Reason is required to open a ticket.', ephemeral: true });
+                if (!reason || !amount || !paymentmethod || !video) {
+                    return interaction.reply({ content: 'All fields are required to create a ticket.', ephemeral: true });
                 }
 
-                const categoryId = '1143259888244502590'; // The ID for the ticket category
+                const categoryId = '1143259888244502590'; // The category ID for the ticket channels
                 const guild = interaction.guild;
 
+                // Create the ticket channel with specific permissions
                 const ticketChannel = await guild.channels.create({
                     name: `purchase-${interaction.user.username}`,
                     type: ChannelType.GuildText,
@@ -81,11 +80,11 @@ module.exports = {
                             deny: [PermissionFlagsBits.ViewChannel]
                         },
                         {
-                            id: '1255792278295937126',
+                            id: '1255792278295937126', // The role ID for staff
                             allow: [PermissionFlagsBits.ViewChannel]
                         },
                         {
-                            id: interaction.user.id,
+                            id: interaction.user.id, // The user who created the ticket
                             allow: [PermissionFlagsBits.ViewChannel]
                         }
                     ]
@@ -95,19 +94,17 @@ module.exports = {
 
                 const embed = new EmbedBuilder()
                     .setColor(0x00AE86)
-                    .setTitle('Purchase Assistance')
-                    .setImage("https://cdn.discordapp.com/attachments/1311352918036975726/1312433384844169297/standard_1.gif")
-                    .setDescription(`Hey, thank you for reaching out to our team for your purchase request. Please wait for our team response to your ticket.
+                    .setTitle('Purchase Request Assistance')
+                    .setDescription(`Thank you for creating a ticket! Below are the details:
 
-                    > User Name: ${interaction.user.tag}
-                    > Service: ${reason}
-                    > Amount: ${interaction.fields.getTextInputValue('amount')}
-                    > Payment Method: ${interaction.fields.getTextInputValue('paymentmethod')}
-                    > Video/Account Link: ${interaction.fields.getTextInputValue('video')}`)
+                    > Service Type: ${reason}
+                    > Amount: ${amount}
+                    > Payment Method: ${paymentmethod}
+                    > Video Link: ${video}`)
                     .setFooter({ text: 'Magnum Store', iconURL: guild.iconURL() });
 
                 const closeButton = new ButtonBuilder()
-                    .setCustomId('close_ticket2')
+                    .setCustomId('close_ticket')
                     .setLabel('Close Ticket')
                     .setStyle(ButtonStyle.Danger);
 
@@ -122,74 +119,8 @@ module.exports = {
 
                 console.log(`Ticket channel created successfully for ${interaction.user.username}`);
             }
-
-            // Handling the ticket close button
-            if (interaction.isButton() && interaction.customId === 'close_ticket2') {
-                const ticketChannel = interaction.channel;
-
-                // Ensure the ticket creator is the one closing it
-                if (ticketCreator.id !== interaction.user.id) {
-                    return interaction.reply({
-                        content: 'You are not the creator of this ticket and cannot close it.',
-                        ephemeral: true
-                    });
-                }
-
-                const confirmationEmbed = new EmbedBuilder()
-                    .setColor(0xFF0000)
-                    .setTitle('Are you sure you want to close this ticket?')
-                    .setDescription('Once closed, you won\'t be able to reply to this ticket. Please confirm.')
-                    .setFooter({ text: 'Magnum Store', iconURL: ticketChannel.guild.iconURL() });
-
-                const yesButton = new ButtonBuilder()
-                    .setCustomId('close_ticket_confirm2')
-                    .setLabel('Yes, Close Ticket')
-                    .setStyle(ButtonStyle.Danger);
-
-
-                const row = new ActionRowBuilder().addComponents(yesButton);
-
-                await interaction.reply({
-                    embeds: [confirmationEmbed],
-                    components: [row],
-                    ephemeral: true
-                });
-            }
-
-            // Confirming ticket closure
-            if (interaction.isButton() && interaction.customId === 'close_ticket_confirm2') {
-                const ticketChannel = interaction.channel;
-
-                await interaction.deferReply({ ephemeral: true });
-
-                try {
-                    // Generate transcript of the ticket channel
-                    const transcriptAttachment = await discordTranscripts.createTranscript(ticketChannel, {
-                        limit: -1,
-                        returnBuffer: true,
-                        fileName: `${ticketChannel.name}.html`
-                    });
-
-                    await ticketChannel.delete();
-                    await interaction.followUp({
-                        content: 'The ticket has been closed successfully.',
-                        ephemeral: true
-                    });
-
-                    await interaction.user.send({
-                        content: 'Here is the transcript of your closed ticket:',
-                        files: [transcriptAttachment]
-                    });
-
-                    console.log(`Ticket ${ticketChannel.name} has been closed and transcript sent.`);
-                } catch (error) {
-                    console.error('Error closing ticket:', error);
-                    await interaction.followUp({ content: 'An error occurred while closing the ticket.', ephemeral: true });
-                }
-            }
-
         } catch (error) {
             console.error('Error processing interaction:', error);
         }
-    }
+    },
 };

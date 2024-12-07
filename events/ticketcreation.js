@@ -152,7 +152,6 @@ module.exports = {
                         .setTitle('Ticket Closed')
                         .setDescription(`Hello ${interaction.user.username}, your support ticket has been closed successfully. Information about the ticket has been provided below.
 
-                        > Ticket ID: ${interaction.channel.id}
                         > Closed By: ${interaction.user.tag}
                         > Open Time: ${interaction.channel.createdAt}
                         > Close Time: ${new Date().toLocaleString()}`)

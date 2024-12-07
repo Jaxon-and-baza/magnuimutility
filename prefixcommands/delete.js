@@ -31,7 +31,7 @@ module.exports = {
                 const file = new AttachmentBuilder(transcriptFilePath);
 
                 const embed = new EmbedBuilder()
-                    .setColor(0x2f3136) // Match your bot's theme
+                    .setColor(`#8CFF9E`) // Match your bot's theme
                     .setImage(logoURL)
                     .setDescription('Ticket Closed\nThank you for using Magnum Store. Your ticket has been closed.\n\nMagnum Store');
 

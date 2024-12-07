@@ -1,35 +1,56 @@
+const { PermissionsBitField, AttachmentBuilder, EmbedBuilder } = require('discord.js');
+const fs = require('fs');
+
 module.exports = {
-    name: 'deletechannel',
-    description: 'Deletes the channel the command was used in.',
-    async execute(message, args) {
-      // Check if the user has the correct role
-      const requiredRoleId = '1255792278295937126';
-      if (!message.member.roles.cache.has(requiredRoleId)) {
-        return message.reply('You do not have permission to use this command.');
-      }
-  
-      // Check if the user is trying to delete the current channel
-      const channel = message.channel;
-  
-      // Check if the bot has permission to manage the channel
-      if (!message.guild.me.permissions.has('MANAGE_CHANNELS')) {
-        return message.reply('I do not have permission to delete the channel.');
-      }
-  
-      // Delete the channel
-      try {
-        // Send a DM to the user informing them about the deletion
-        await message.author.send(`The channel **${channel.name}** has been deleted as per your request.`);
-  
-        // Delete the channel the command was used in
-        await channel.delete();
-  
-        // Reply in the same channel (this message will be deleted after the channel is deleted)
-        return message.reply(`The channel **${channel.name}** has been deleted, and you will receive a DM with more details.`);
-      } catch (error) {
-        console.error(error);
-        return message.reply('An error occurred while trying to delete the channel.');
-      }
+    name: 'close',
+    description: 'Close a ticket and send the transcript to the user.',
+    async execute(interaction) {
+        // Check if the command is used in a ticket channel
+        if (!interaction.channel.name.startsWith('ticket-')) {
+            return interaction.reply({ content: 'This command can only be used in a ticket channel.', ephemeral: true });
+        }
+
+        // Fetch the ticket channel messages for the transcript
+        const messages = await interaction.channel.messages.fetch({ limit: 100 });
+        const transcript = messages.map(msg => `${msg.author.tag}: ${msg.content}`).reverse().join('\n');
+
+        // Save transcript to a .txt file
+        const transcriptFilePath = './transcript.txt';
+        fs.writeFileSync(transcriptFilePath, transcript);
+
+        // Get the user who opened the ticket
+        const userId = interaction.channel.topic; // Assuming user ID is saved in the channel topic
+        const user = await interaction.client.users.fetch(userId);
+
+        if (user) {
+            try {
+                // Send the transcript and message to the user
+                const logoURL = 'https://cdn.discordapp.com/attachments/1311352856556601536/1311725268167032989/Black_and_White_Simple_Typographic_Phantom_Halloween_Logo_20241128_180744_0000.png';
+                const gifURL = 'https://cdn.discordapp.com/attachments/1266776833546911806/1312379055743701003/standard.gif';
+
+                const file = new AttachmentBuilder(transcriptFilePath);
+
+                const embed = new EmbedBuilder()
+                    .setColor(0x2f3136) // Match your bot's theme
+                    .setImage(logoURL)
+                    .setDescription('Ticket Closed\nThank you for using Magnum Store. Your ticket has been closed.\n\nMagnum Store');
+
+                await user.send({
+                    embeds: [embed],
+                    files: [file],
+                });
+
+                await user.send(gifURL);
+            } catch (error) {
+                console.error(`Could not DM the user: ${error}`);
+            }
+        }
+
+        // Inform in the channel and delete it after sending the messages
+        await interaction.reply({ content: 'Closing the ticket...', ephemeral: true });
+        await interaction.channel.delete();
+
+        // Clean up transcript file
+        fs.unlinkSync(transcriptFilePath);
     },
-  };
-  
+};
